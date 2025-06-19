@@ -1,0 +1,14 @@
+{
+    "Year": "",
+    "Month": "",
+    "BaseUrl": "",
+    "Advisories": [
+        {
+            "AdvisoryID": "",
+            "Scope": "",
+            "Severity": "",
+            "CVSS": "",
+            "Overview": ""
+        }
+    ]
+}

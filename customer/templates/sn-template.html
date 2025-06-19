@@ -1,0 +1,22 @@
+<p>Kindly refer to the <strong>Security Advisories</strong> section below, where you can access advisories in Portable Document Format (PDF). These advisories include a description of the vulnerability, its potential impact, and the recommended mitigation solutions. We encourage you to carefully follow the instructions provided to ensure that your deployment is fully secured against the vulnerability.</p>
+<p>Please note that only the product versions affected according to our<a style="color: #ff7300 !important; text-decoration: none;" href="https://security.docs.wso2.com/en/latest/security-processes/vulnerability-management-process/#backport-policy"> back porting policy</a> have been included in this announcement.</p>
+<p>This is a system-generated announcement. Please refrain from replying to this ticket. If you have any concerns regarding the advisories provided, kindly create a separate ticket.</p>
+<p><strong>Security Advisories</strong></p>
+<div style="background-color: #eee; border-radius: 10px; padding: 15px; width: 100%;">
+<div style="color: #1a8038; margin: 0;">
+{% for item in data_list %}
+    <div><span style="color: #1a8038;"><strong>{{ item.AdvisoryID | safe}}: {{ item.Scope | safe}}</strong></span></div>
+    <div style="color: #1a8038;">{{ item.Overview | safe}}</div>
+    <div style="color: #1a8038;">Severity: {{ item.Severity | safe}}</div>
+    <div style="color: #1a8038;"><a style="color: #1a8038 !important; text-decoration: underline;" href="{{ item['DownloadLink'] }}">Download here</a></div>
+    <br />
+{% endfor %}
+</div>
+</div>
+</div>
+</div>
+<p>&nbsp;</p>
+<p>We have tested the general product use cases after incorporating these fixes. Nevertheless, we highly recommend that you test your business use cases in a development or test environment before updating your production environment.</p>
+<p>Please note that, according to the <a style="color: #ff7300 !important; text-decoration: none;" href="https://security.docs.wso2.com/en/latest/security-processes/vulnerability-management-process/"> WSO2 security vulnerability management process</a>, all vulnerabilities included in these security advisories will be publicly announced on the <a style="color: #ff7300 !important; text-decoration: none;" href="https://security.docs.wso2.com/en/latest/security-announcements/security-advisories/"> Security Advisories</a> page four weeks from the date of this announcement.</p>
+<p><strong>Note: </strong>You may utilize the <a style="color: #ff7300 !important; text-decoration: none;" href="https://support.wso2.com/support"> WSO2 Info Portal</a> to access more detailed information on the U2 update level for the respective version(s) of WSO2 products.</p>
+<p>Thanks,<br/>WSO2 Team</p>

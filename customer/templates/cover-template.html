@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A4 Page with Triangles</title>
+  <style>
+    /* Global Reset */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    /* Page Setup */
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    /* A4 Container */
+    .a4-page {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
+      background-color: #ffa64c;
+      overflow: hidden;
+    }
+
+    /* Center A4 Page in Viewport */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #ffa64c;
+    }
+
+    /* Triangles */
+    .triangle {
+      position: absolute;
+      left: 0;
+      width: 0;
+      height: 0;
+      border-left: 8.3in solid transparent;
+      border-right: 0 solid transparent;
+      z-index: 100;
+    }
+
+    .triangle-down {
+      top: 0;
+      border-top: 1.7in solid #595959;
+    }
+
+    .triangle-up {
+      bottom: 0;
+      border-bottom: 4in solid #595959;
+    }
+
+    /* Triangle Text */
+    .triangle-text {
+      position: absolute;
+      bottom: 0.1in; /* Adjusted to ensure it stays within the printable area */
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+      z-index: 101;
+      white-space: nowrap;
+    }
+
+    /* First Page Description */
+    .firstpage-desc {
+      position: absolute;
+      top: 3in;
+      left: 0.3in;
+      width: 8.3in;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .firstpage-desc h1 {
+      font-size: 70px;
+      color: #333333;
+      margin: 0;
+    }
+
+    .firstpage-desc p {
+      font-size: 20px;
+      color: #333333;
+      margin: 10px 0;
+    }
+
+    .firstpage-desc p:first-of-type {
+      font-size: 30px;
+      color: #f2f2f2;
+    }
+
+    /* Overlay Logo */
+    .overlayLogo {
+      position: absolute;
+      top: 10in;
+      left: 5.5in;
+      width: 2.5in;
+      z-index: 99999;
+    }
+  </style>
+</head>
+<body>
+  <div class="a4-page">
+    <!-- Triangles -->
+    <div class="triangle triangle-down"></div>
+    <div class="triangle triangle-up"></div>
+    <div class="triangle-text">
+      © {{Year}} WSO2 Inc. Commercial in Confidence / Confidential / Not for Redistribution
+    </div>
+
+    <!-- First Page Description -->
+    <div class="firstpage-desc">
+      <h1>Security Advisory</h1>
+      <p>{{AdvisoryID}}</p>
+      <p>
+        Scope: {{Scope}}<br>
+        Date: {{Date}}<br>
+        Severity: {{Severity}}<br>
+        CVSS Score: {{CVSS}}<br>
+        Email: security@wso2.com
+      </p>
+    </div>
+
+    <!-- Overlay Logo -->
+    <img src="https://upload.wikimedia.org/wikipedia/en/5/56/WSO2_Software_Logo.png" alt="WSO2 Logo" class="overlayLogo">
+  </div>
+</body>
+</html>
