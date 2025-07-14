@@ -40,7 +40,7 @@ def get_pdf_pairs(input_dir):
             processed_files.add(file1)
             processed_files.add(file2)
         else:
-            print("incorrect file name. Please check both files with same name.")
+            print("incorrect file name. Please check both file names" +file1+ " and " + file2)
     return pairs
 
 if __name__ == "__main__":
