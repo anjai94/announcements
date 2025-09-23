@@ -20,7 +20,7 @@ data_list = []
 for advisory in data['Advisories']:
     # Replace "/" with "_" in AdvisoryID
     advisory_id = advisory['AdvisoryID'].replace("/", "_")
-    download_link = f"{base_url}{year}/{month}/{advisory_id}.pdf"
+    download_link = f"{base_url}/{year}/{month}/{advisory_id}.pdf"
     advisory['DownloadLink'] = download_link
     data_list.append(advisory)
 
