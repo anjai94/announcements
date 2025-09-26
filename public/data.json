@@ -1,15 +1,15 @@
-[
-    {
-        "Title": "",
-        "Severity": "",
-        "CVSS": "",
-        "Products": [""],
-        "Overview": "",
-        "Description": "",
-        "Impact": "",
-        "PR": [],
-        "Solution":"",
-        "References":[],
-        "Credits": ""
-    }
-]
+{ 
+    "Year": "",
+    "Month": "",
+    "BaseUrl": "",
+    "Advisories": [
+        {
+            "AdvisoryID": "",
+            "Scope": "",
+            "Severity": "",
+            "CVSS": "",
+            "Overview": "",
+            "PR":[]
+        }
+    ]
+}
