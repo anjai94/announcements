@@ -1,0 +1,167 @@
+name: Public Announcement label (30d after Batched)
+
+# Adds the "PublicPR/Pending from IAM" label to a PR/issue 30 days after it
+# enters the "Batched for Public Announcement" status on the Projects v2 board.
+#
+# How the 30-day clock works (Actions can't sleep, and Projects v2 has no
+# "status changed at" timestamp): the first time this cron sees an item in the
+# Batched status it stamps a hidden MARKER_LABEL on the underlying PR/issue.
+# The PR/issue timeline records when that label was added — that timestamp is
+# the clock. Once it is >= WAIT_MINUTESS old (and the item is still Batched), the
+# target label is applied. Granularity is ~1 day, which is fine for a 30-day timer.
+#
+# REQUIRED SECRET: PROJECT_TOKEN
+#   A classic PAT (scopes: repo, project) or a GitHub App token with
+#   read access to the project and write access to issues in the target repo.
+#   The default GITHUB_TOKEN CANNOT read user/org Projects v2, so this is mandatory.
+
+on:
+  schedule:
+    - cron: '*/4 * * * *'   # daily at 06:00 UTC
+  workflow_dispatch:        # allow manual runs for testing
+
+permissions:
+  contents: read
+
+jobs:
+  label-batched:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_OWNER: anjai94                                  # user or org login that owns the project
+      OWNER_TYPE: user                                        # "user" or "organization"
+      PROJECT_NUMBER: '1'                                     # project number from the board URL
+      STATUS_FIELD: Status                                    # single-select field name on the board
+      STATUS_NAME: Batched for Public Announcement            # status value that starts the clock
+      MARKER_LABEL: batched-tracked                           # hidden marker that records the clock start
+      WAIT_MINUTESS: '2'
+      # After WAIT_MINUTESS, each rule fires when ALL of its "sources" labels are
+      # present, adding any of its "targets" not already on the item. Multiple
+      # rules can fire for one item. To extend: add rules, add more entries to
+      # "sources" (all required) or "targets" (all added). This block is the
+      # only place you need to edit.
+      LABEL_RULES: |
+        [
+          { "sources": ["Patch/IAM Completed"],  "targets": ["PublicPR/Pending from IAM"] },
+          { "sources": ["Patch/APIM Completed"], "targets": ["PublicPR/Pending from APIM"] }
+        ]
+    steps:
+      - name: Apply label 30 days after Batched
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const {
+              PROJECT_OWNER, OWNER_TYPE, PROJECT_NUMBER,
+              STATUS_FIELD, STATUS_NAME,
+              MARKER_LABEL, WAIT_MINUTESS, LABEL_RULES,
+            } = process.env;
+
+            // Rules: add a rule's targets when all of its sources are present.
+            const rules = JSON.parse(LABEL_RULES);
+            const waitMs = Number(WAIT_MINUTESS) * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const ownerField = OWNER_TYPE === 'organization' ? 'organization' : 'user';
+
+            // 1) Page through every project item, reading its Status and the
+            //    underlying issue/PR (number + repo).
+            const query = `
+              query($login:String!, $number:Int!, $cursor:String) {
+                ${ownerField}(login:$login) {
+                  projectV2(number:$number) {
+                    items(first:100, after:$cursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        fieldValueByName(name:"${STATUS_FIELD}") {
+                          ... on ProjectV2ItemFieldSingleSelectValue { name }
+                        }
+                        content {
+                          __typename
+                          ... on Issue       { number repository { owner { login } name } }
+                          ... on PullRequest  { number repository { owner { login } name } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            const batched = [];
+            let cursor = null;
+            do {
+              const data = await github.graphql(query, {
+                login: PROJECT_OWNER, number: Number(PROJECT_NUMBER), cursor,
+              });
+              const project = data[ownerField].projectV2;
+              for (const node of project.items.nodes) {
+                const status = node.fieldValueByName?.name;
+                const content = node.content;
+                if (status !== STATUS_NAME) continue;
+                if (!content || !content.number || !content.repository) continue; // draft item
+                batched.push({
+                  owner: content.repository.owner.login,
+                  repo: content.repository.name,
+                  number: content.number,
+                  type: content.__typename,
+                });
+              }
+              cursor = project.items.pageInfo.hasNextPage ? project.items.pageInfo.endCursor : null;
+            } while (cursor);
+
+            core.info(`Found ${batched.length} item(s) in status "${STATUS_NAME}".`);
+
+            for (const item of batched) {
+              const { owner, repo, number } = item;
+              const ref = `${owner}/${repo}#${number}`;
+
+              // Current labels on the underlying issue/PR.
+              const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: number });
+              const labels = issue.labels.map(l => (typeof l === 'string' ? l : l.name));
+
+              // First sighting in Batched status -> start the clock with the marker.
+              if (!labels.includes(MARKER_LABEL)) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: [MARKER_LABEL] });
+                core.info(`${ref}: marked with "${MARKER_LABEL}" (clock started).`);
+                continue;
+              }
+
+              // Marker present -> find when it was added (earliest "labeled" event).
+              const events = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                owner, repo, issue_number: number, per_page: 100,
+              });
+              const markedAt = events
+                .filter(e => e.event === 'labeled' && e.label && e.label.name === MARKER_LABEL)
+                .map(e => new Date(e.created_at).getTime())
+                .sort((a, b) => a - b)[0];
+
+              if (markedAt == null) {
+                core.warning(`${ref}: has "${MARKER_LABEL}" but no labeled event found; skipping.`);
+                continue;
+              }
+
+              const ageDays = Math.floor((now - markedAt) / 86400000);
+              if (now - markedAt < waitMs) {
+                core.info(`${ref}: ${ageDays}d in Batched (< ${WAIT_MINUTESS}d), waiting.`);
+                continue;
+              }
+
+              // 30 days elapsed: fire every rule whose sources are all present,
+              // collecting target labels not already on the item.
+              const labelSet = new Set(labels);
+              const toAdd = new Set();
+              for (const rule of rules) {
+                const sources = rule.sources || [];
+                const targets = rule.targets || [];
+                if (sources.length && sources.every(s => labelSet.has(s))) {
+                  for (const t of targets) if (!labelSet.has(t)) toAdd.add(t);
+                }
+              }
+              const additions = [...toAdd];
+
+              if (additions.length === 0) {
+                core.info(`${ref}: ${ageDays}d elapsed but no rule produced a new label; nothing to add.`);
+                continue;
+              }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: additions });
+              core.info(`${ref}: ${ageDays}d in Batched >= ${WAIT_MINUTESS}d -> added ${additions.map(l => `"${l}"`).join(', ')}.`);
+            }
