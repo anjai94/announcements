@@ -1,14 +1,16 @@
-name: Public Announcement label (30d after Batched)
+name: Public Announcement label (TEST - 2min after Batched)
 
-# Adds the "PublicPR/Pending from IAM" label to a PR/issue 30 days after it
-# enters the "Batched for Public Announcement" status on the Projects v2 board.
+# TEST COPY of public-announcement-label.yml.
+# Same logic, but the clock is 2 MINUTES instead of 30 days and the cron runs
+# every 3 minutes so the two-pass (marker -> label) flow completes quickly.
+# DO NOT use for production — use public-announcement-label.yml for that.
 #
-# How the 30-day clock works (Actions can't sleep, and Projects v2 has no
+# How the clock works (Actions can't sleep, and Projects v2 has no
 # "status changed at" timestamp): the first time this cron sees an item in the
 # Batched status it stamps a hidden MARKER_LABEL on the underlying PR/issue.
 # The PR/issue timeline records when that label was added — that timestamp is
-# the clock. Once it is >= WAIT_MINUTESS old (and the item is still Batched), the
-# target label is applied. Granularity is ~1 day, which is fine for a 30-day timer.
+# the clock. Once it is >= WAIT_MINUTES old (and still Batched), the target
+# label is applied.
 #
 # REQUIRED SECRET: PROJECT_TOKEN
 #   A classic PAT (scopes: repo, project) or a GitHub App token with
@@ -17,7 +19,7 @@ name: Public Announcement label (30d after Batched)
 
 on:
   schedule:
-    - cron: '*/4 * * * *'   # daily at 06:00 UTC
+    - cron: '*/3 * * * *'   # every 3 minutes (TEST)
   workflow_dispatch:        # allow manual runs for testing
 
 permissions:
@@ -33,8 +35,8 @@ jobs:
       STATUS_FIELD: Status                                    # single-select field name on the board
       STATUS_NAME: Batched for Public Announcement            # status value that starts the clock
       MARKER_LABEL: batched-tracked                           # hidden marker that records the clock start
-      WAIT_MINUTESS: '2'
-      # After WAIT_MINUTESS, each rule fires when ALL of its "sources" labels are
+      WAIT_MINUTES: '2'                                       # TEST: label added 2 min after Batched
+      # After WAIT_MINUTES, each rule fires when ALL of its "sources" labels are
       # present, adding any of its "targets" not already on the item. Multiple
       # rules can fire for one item. To extend: add rules, add more entries to
       # "sources" (all required) or "targets" (all added). This block is the
@@ -45,7 +47,7 @@ jobs:
           { "sources": ["Patch/APIM Completed"], "targets": ["PublicPR/Pending from APIM"] }
         ]
     steps:
-      - name: Apply label 30 days after Batched
+      - name: Apply label 2 minutes after Batched
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PROJECT_TOKEN }}
@@ -53,12 +55,12 @@ jobs:
             const {
               PROJECT_OWNER, OWNER_TYPE, PROJECT_NUMBER,
               STATUS_FIELD, STATUS_NAME,
-              MARKER_LABEL, WAIT_MINUTESS, LABEL_RULES,
+              MARKER_LABEL, WAIT_MINUTES, LABEL_RULES,
             } = process.env;
 
             // Rules: add a rule's targets when all of its sources are present.
             const rules = JSON.parse(LABEL_RULES);
-            const waitMs = Number(WAIT_MINUTESS) * 24 * 60 * 60 * 1000;
+            const waitMs = Number(WAIT_MINUTES) * 60 * 1000;
             const now = Date.now();
             const ownerField = OWNER_TYPE === 'organization' ? 'organization' : 'user';
 
@@ -138,13 +140,13 @@ jobs:
                 continue;
               }
 
-              const ageDays = Math.floor((now - markedAt) / 86400000);
+              const ageMin = Math.floor((now - markedAt) / 60000);
               if (now - markedAt < waitMs) {
-                core.info(`${ref}: ${ageDays}d in Batched (< ${WAIT_MINUTESS}d), waiting.`);
+                core.info(`${ref}: ${ageMin}m in Batched (< ${WAIT_MINUTES}m), waiting.`);
                 continue;
               }
 
-              // 30 days elapsed: fire every rule whose sources are all present,
+              // Wait elapsed: fire every rule whose sources are all present,
               // collecting target labels not already on the item.
               const labelSet = new Set(labels);
               const toAdd = new Set();
@@ -158,10 +160,10 @@ jobs:
               const additions = [...toAdd];
 
               if (additions.length === 0) {
-                core.info(`${ref}: ${ageDays}d elapsed but no rule produced a new label; nothing to add.`);
+                core.info(`${ref}: ${ageMin}m elapsed but no rule produced a new label; nothing to add.`);
                 continue;
               }
 
               await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: additions });
-              core.info(`${ref}: ${ageDays}d in Batched >= ${WAIT_MINUTESS}d -> added ${additions.map(l => `"${l}"`).join(', ')}.`);
+              core.info(`${ref}: ${ageMin}m in Batched >= ${WAIT_MINUTES}m -> added ${additions.map(l => `"${l}"`).join(', ')}.`);
             }
